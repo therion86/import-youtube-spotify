@@ -9,13 +9,11 @@ class ImportWindow(QMainWindow):
         self.setWindowTitle("Import auswählen")
         self.setGeometry(100, 100, 400, 200)
 
-        # Layout und Buttons
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
 
         layout = QVBoxLayout()
 
-        # Buttons zum Auswahl der Importoption
         spotify_button = QPushButton("Spotify Import", self)
         spotify_button.clicked.connect(self.import_spotify)
         layout.addWidget(spotify_button)
@@ -27,22 +25,18 @@ class ImportWindow(QMainWindow):
         central_widget.setLayout(layout)
 
     def import_spotify(self):
-        """Startet die Spotify-Importfunktion."""
         try:
-            # Relativer Pfad zu spotify.py
             script_path = os.path.join(os.path.dirname(__file__), 'spotify.py')
             subprocess.run([sys.executable, script_path], check=True)
         except subprocess.CalledProcessError as e:
-            QMessageBox.critical(self, "Fehler", f"Fehler beim Starten von Spotify: {e}")
+            QMessageBox.critical(self, "Fehler", f"Error while starting spotify: {e}")
 
     def import_youtube(self):
-        """Startet die YouTube-Importfunktion."""
         try:
-            # Relativer Pfad zu youtube.py
             script_path = os.path.join(os.path.dirname(__file__), 'youtube.py')
             subprocess.run([sys.executable, script_path], check=True)
         except subprocess.CalledProcessError as e:
-            QMessageBox.critical(self, "Fehler", f"Fehler beim Starten von YouTube: {e}")
+            QMessageBox.critical(self, "Fehler", f"Error while starting youtube: {e}")
 
 
 if __name__ == "__main__":

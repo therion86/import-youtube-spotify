@@ -10,55 +10,48 @@ from PyQt5.QtCore import Qt
 import google_auth_oauthlib.flow
 import googleapiclient.discovery
 import googleapiclient.errors
-import requests  # Hier wird requests importiert
+import requests
 from google.auth.transport.requests import Request
-import time  # Wir verwenden time.sleep, um Verzögerungen zwischen den Anfragen einzubauen
+import time
 
-# Lade Konfigurationsdaten aus youtube.json (OAuth2 JSON)
 def load_youtube_config():
     try:
         with open("youtube.json", "r") as config_file:
             config = json.load(config_file)
-            return config  # Gibt die gesamte Konfiguration zurück
+            return config
     except FileNotFoundError:
-        print("Fehler: Die Datei 'youtube.json' wurde nicht gefunden.")
+        print("Error: youtube.json not found")
         sys.exit(1)
     except json.JSONDecodeError:
-        print("Fehler: Die Datei 'youtube.json' enthält ungültiges JSON.")
+        print("Error: youtube.json has no valid JSON.")
         sys.exit(1)
 
-# Authentifizierung und Erstellen des YouTube API-Clients
 def authenticate_youtube(config):
-    client_secrets_file = "youtube.json"  # Das OAuth2 JSON von YouTube
+    client_secrets_file = "youtube.json"
 
-    # OAuth2-Flow initialisieren
     flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_secrets_file(
         client_secrets_file, scopes=["https://www.googleapis.com/auth/youtube.force-ssl"]
     )
 
-    # Authentifizierung durchführen
     credentials = flow.run_local_server(port=0)
 
-    # YouTube API-Client erstellen
     youtube = googleapiclient.discovery.build(
         "youtube", "v3", credentials=credentials
     )
 
     return youtube, credentials
 
-# Manuelle Suche für YouTube
 class SearchWizard(QDialog):
-    """Dialog zur manuellen Suche nach YouTube-Videos."""
     def __init__(self, query, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Manuelle Videosuche")
+        self.setWindowTitle("Manual video search")
         self.updated_query = query
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(f"Suchbegriff: {query}"))
+        layout.addWidget(QLabel(f"Query: {query}"))
 
         self.query_input = QLineEdit(self)
-        self.query_input.setText(query)  # Setze den initialen Text
+        self.query_input.setText(query)
         layout.addWidget(self.query_input)
 
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -67,16 +60,13 @@ class SearchWizard(QDialog):
         layout.addWidget(button_box)
 
     def accept(self):
-        """Speichert den aktualisierten Suchbegriff."""
         self.updated_query = self.query_input.text()
         super().accept()
 
-# Dialog zur Auswahl eines YouTube-Videos
 class VideoWizard(QDialog):
-    """Dialog zur Auswahl von YouTube-Suchergebnissen mit Thumbnail."""
     def __init__(self, video, search_results, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Video auswählen")
+        self.setWindowTitle("Select video")
         self.selected_video_id = None
 
         layout = QVBoxLayout(self)
@@ -85,8 +75,7 @@ class VideoWizard(QDialog):
         self.result_list = QListWidget(self)
         self.result_list.setSelectionMode(QListWidget.SingleSelection)
 
-        # Füge alle Ergebnisse als Listeneinträge hinzu
-        self.search_results = search_results  # Speichern der Suchergebnisse
+        self.search_results = search_results
         for result in search_results:
             item = QListWidgetItem(f"{result['snippet']['title']}")
             thumbnail_url = result['snippet']['thumbnails']['high']['url'] if result['snippet']['thumbnails'] else None
@@ -107,14 +96,12 @@ class VideoWizard(QDialog):
         layout.addWidget(button_box)
 
     def accept(self):
-        """Wählt das angeklickte Video aus und gibt die Video-ID zurück."""
         selected_item = self.result_list.currentItem()
         if selected_item:
             index = self.result_list.row(selected_item)
             self.selected_video_id = self.search_results[index]['id']['videoId']
         super().accept()
 
-# Hauptfenster für den Import
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -122,9 +109,8 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 600, 400)
 
         self.song_data = None
-        self.skipped_songs = []  # Liste für übersprungene Titel
+        self.skipped_songs = [] 
 
-        # Zentrales Widget erstellen
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
 
@@ -132,20 +118,18 @@ class MainWindow(QMainWindow):
         self.song_list_widget = QListWidget(self)
         layout.addWidget(self.song_list_widget)
 
-        load_button = QPushButton("Excel-Datei laden")
+        load_button = QPushButton("Load excel file")
         load_button.clicked.connect(self.load_excel)
         layout.addWidget(load_button)
 
-        youtube_button = QPushButton("Zu YouTube hinzufügen")
+        youtube_button = QPushButton("Add to youtube")
         youtube_button.clicked.connect(self.add_to_youtube)
         layout.addWidget(youtube_button)
 
-        # Layout dem zentralen Widget zuweisen
         central_widget.setLayout(layout)
 
     def load_excel(self):
-        """Lädt eine Excel-Datei und zeigt die Songs an."""
-        file_name, _ = QFileDialog.getOpenFileName(self, "Excel-Datei auswählen", "", "Excel Files (*.xlsx *.xls)")
+        file_name, _ = QFileDialog.getOpenFileName(self, "Select excel file", "", "Excel Files (*.xlsx *.xls)")
         if not file_name:
             return
 
@@ -156,30 +140,31 @@ class MainWindow(QMainWindow):
                 artist, title = row[0], row[1]
                 self.song_list_widget.addItem(f"{artist} - {title}")
         except Exception as e:
-            QMessageBox.critical(self, "Fehler", f"Fehler beim Laden der Excel-Datei: {e}")
+            QMessageBox.critical(self, "Error", f"Error while loading excel file: {e}")
 
     def add_to_youtube(self):
-        """Fügt die Songs zu YouTube hinzu."""
         if self.song_data is None:
-            QMessageBox.warning(self, "Warnung", "Keine Excel-Datei geladen.")
+            QMessageBox.warning(self, "Warning", "No excel file loaded.")
             return
 
-        playlist_name, ok = QInputDialog.getText(self, "Playlist erstellen", "Name der Playlist:")
+        playlist_name, ok = QInputDialog.getText(self, "Create playlist", "Name of playlist:")
         if not ok or not playlist_name:
             return
+        
+        playlist_description, ok = QInputDialog.getText(self, "Playlist descrpiton", "Description of playlist:")
+        if not ok or not playlist_description:
+            return
 
-        # Konfiguration laden und YouTube-Client erstellen
         config = load_youtube_config()
         youtube, credentials = authenticate_youtube(config)
 
         try:
-            # YouTube Playlist erstellen
             playlist_request = youtube.playlists().insert(
                 part="snippet,status",
                 body={
                     "snippet": {
                         "title": playlist_name,
-                        "description": "Eine Playlist mit deinen Lieblingssongs",
+                        "description": playlist_description,
                     },
                     "status": {
                         "privacyStatus": "public"
@@ -188,17 +173,15 @@ class MainWindow(QMainWindow):
             )
             playlist_response = playlist_request.execute()
             playlist_id = playlist_response["id"]
-            print(f"Playlist '{playlist_name}' erfolgreich erstellt.")
+            print(f"Playlist '{playlist_name}' created successful.")
 
-            # Songs zur Playlist hinzufügen
             for _, row in self.song_data.iterrows():
                 artist, title = row[0], row[1]
                 query = f"{artist} {title}"
 
                 while True:
-                    # Wenn die Session abgelaufen ist, Token erneuern
                     if credentials and credentials.expired and credentials.refresh_token:
-                        credentials.refresh(Request())  # Token erneuern
+                        credentials.refresh(Request())
 
                     search_results = youtube.search().list(
                         part="snippet",
@@ -218,8 +201,8 @@ class MainWindow(QMainWindow):
                         break
                     else:
                         manual_search = QMessageBox.question(
-                            self, "Song übersprungen",
-                            "Kein passendes Video gefunden. Möchtest du erneut suchen?",
+                            self, "Song skipped",
+                            "No valid video found. Do you want to search again?",
                             QMessageBox.Yes | QMessageBox.No
                         )
                         if manual_search == QMessageBox.No:
@@ -227,31 +210,30 @@ class MainWindow(QMainWindow):
                             break
                         search_dialog = SearchWizard(query, self)
                         if search_dialog.exec_() == QDialog.Accepted:
-                            query = search_dialog.updated_query  # Aktualisiert den Suchbegriff
+                            query = search_dialog.updated_query
                         else:
                             self.skipped_songs.append(query)
                             break
 
-            QMessageBox.information(self, "Erfolg", f"Playlist '{playlist_name}' wurde erfolgreich erstellt.")
+            QMessageBox.information(self, "Success", f"Playlist '{playlist_name}' successful created.")
             self.show_skipped_songs()
 
         except Exception as e:
-            QMessageBox.critical(self, "Fehler", f"Fehler bei der YouTube-Integration: {e}")
+            QMessageBox.critical(self, "Error", f"Error with youtube integration: {e}")
 
     def show_skipped_songs(self):
-        """Zeigt übersprungene Songs in einem Dialog an."""
         if not self.skipped_songs:
-            QMessageBox.information(self, "Info", "Keine Songs wurden übersprungen.")
+            QMessageBox.information(self, "Info", "No songs where skipped.")
             return
 
         skipped_dialog = QDialog(self)
-        skipped_dialog.setWindowTitle("Übersprungene Songs")
+        skipped_dialog.setWindowTitle("Skipped Songs")
         layout = QVBoxLayout(skipped_dialog)
 
         skipped_songs_text = ", ".join(self.skipped_songs)
 
         text_edit = QTextEdit(skipped_dialog)
-        text_edit.setPlainText(skipped_songs_text)  # Alle Songs als eine einzelne, komma-separierte Liste
+        text_edit.setPlainText(skipped_songs_text)
         text_edit.setReadOnly(True)
         layout.addWidget(text_edit)
 
@@ -262,7 +244,6 @@ class MainWindow(QMainWindow):
         skipped_dialog.exec_()
 
     def add_video_to_playlist(self, youtube, playlist_id, video_id):
-        """Füge das Video zu einer Playlist hinzu."""
         youtube.playlistItems().insert(
             part="snippet",
             body={

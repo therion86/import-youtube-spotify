@@ -12,17 +12,17 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
 
-# Lade Konfigurationsdaten aus spotify.json
+
 def load_spotify_config():
     try:
         with open("spotify.json", "r") as config_file:
             config = json.load(config_file)
             return config
     except FileNotFoundError:
-        print("Fehler: Die Datei 'spotify.json' wurde nicht gefunden.")
+        print("spotify.json not found!")
         sys.exit(1)
     except json.JSONDecodeError:
-        print("Fehler: Die Datei 'spotify.json' enthält ungültiges JSON.")
+        print("spotify.json is no well-formed json!")
         sys.exit(1)
 
 
@@ -38,17 +38,16 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
 
 
 class SearchWizard(QDialog):
-    """Dialog zur manuellen Songsuche."""
     def __init__(self, query, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Manuelle Songsuche")
+        self.setWindowTitle("Manual Songsearch")
         self.updated_query = query
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(f"Suchbegriff: {query}"))
+        layout.addWidget(QLabel(f"Query: {query}"))
 
         self.query_input = QLineEdit(self)
-        self.query_input.setText(query)  # Setze den initialen Text
+        self.query_input.setText(query)
         layout.addWidget(self.query_input)
 
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -57,16 +56,14 @@ class SearchWizard(QDialog):
         layout.addWidget(button_box)
 
     def accept(self):
-        """Speichert den aktualisierten Suchbegriff."""
         self.updated_query = self.query_input.text()
         super().accept()
 
 
 class SongWizard(QDialog):
-    """Dialog zur Auswahl von Spotify-Suchergebnissen mit Albumcover."""
     def __init__(self, song, search_results, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Song auswählen")
+        self.setWindowTitle("Choose Song")
         self.selected_uri = None
 
         layout = QVBoxLayout(self)
@@ -75,8 +72,7 @@ class SongWizard(QDialog):
         self.result_list = QListWidget(self)
         self.result_list.setSelectionMode(QListWidget.SingleSelection)
 
-        # Füge alle Ergebnisse als Listeneinträge hinzu
-        self.search_results = search_results  # Speichern der Suchergebnisse
+        self.search_results = search_results
         for result in search_results:
             item = QListWidgetItem(f"{result['name']} - {', '.join(artist['name'] for artist in result['artists'])}")
             album_cover_url = result['album']['images'][1]['url'] if result['album']['images'] else None
@@ -97,7 +93,6 @@ class SongWizard(QDialog):
         layout.addWidget(button_box)
 
     def accept(self):
-        """Wählt das angeklickte Element aus und gibt den URI zurück."""
         selected_item = self.result_list.currentItem()
         if selected_item:
             index = self.result_list.row(selected_item)
@@ -112,64 +107,58 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 600, 400)
 
         self.song_data = None
-        self.skipped_songs = []  # Liste für übersprungene Titel
+        self.skipped_songs = []
 
-        # Zentrales Widget erstellen
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
 
         layout = QVBoxLayout()
 
-        # Erstelle eine QTableWidget für die Anzeige der Songs
         self.song_table_widget = QTableWidget(self)
-        self.song_table_widget.setColumnCount(2)  # Zwei Spalten: Interpret und Titel
+        self.song_table_widget.setColumnCount(2)
         self.song_table_widget.setHorizontalHeaderLabels(["Interpret", "Titel"])
+        self.song_table_widget.setColumnWidth(0,300)
+        self.song_table_widget.setColumnWidth(1,400)
         layout.addWidget(self.song_table_widget)
 
-        load_button = QPushButton("Excel-Datei laden")
+        load_button = QPushButton("Import Excel")
         load_button.clicked.connect(self.load_excel)
         layout.addWidget(load_button)
 
-        spotify_button = QPushButton("Zu Spotify hinzufügen")
+        spotify_button = QPushButton("Add to Spotify")
         spotify_button.clicked.connect(self.add_to_spotify)
         layout.addWidget(spotify_button)
 
-        # Layout dem zentralen Widget zuweisen
         central_widget.setLayout(layout)
 
     def load_excel(self):
-        """Lädt eine Excel-Datei und zeigt die Songs in einer Tabelle an."""
-        file_name, _ = QFileDialog.getOpenFileName(self, "Excel-Datei auswählen", "", "Excel Files (*.xlsx *.xls)")
+        file_name, _ = QFileDialog.getOpenFileName(self, "Choose File", "", "Excel Files (*.xlsx *.xls)")
         if not file_name:
             return
 
         try:
             self.song_data = pd.read_excel(file_name, header=None, engine='openpyxl')
             
-            # Setze die Zeilenanzahl der Tabelle basierend auf der Anzahl der Zeilen in der Excel-Datei
             self.song_table_widget.setRowCount(len(self.song_data))
 
             for row_idx, row in self.song_data.iterrows():
                 artist, title = row[0], row[1]
-                # Füge die Daten in die Tabelle ein
                 self.song_table_widget.setItem(row_idx, 0, QTableWidgetItem(artist))
                 self.song_table_widget.setItem(row_idx, 1, QTableWidgetItem(title))
 
         except Exception as e:
-            QMessageBox.critical(self, "Fehler", f"Fehler beim Laden der Excel-Datei: {e}")
+            QMessageBox.critical(self, "Error", f"Error while loading excel file: {e}")
 
     def add_to_spotify(self):
-        """Fügt die Songs zu Spotify hinzu."""
         if self.song_data is None:
-            QMessageBox.warning(self, "Warnung", "Keine Excel-Datei geladen.")
+            QMessageBox.warning(self, "Warning", "No excel file was loaded")
             return
 
-        playlist_name, ok = QInputDialog.getText(self, "Playlist erstellen", "Name der Playlist:")
+        playlist_name, ok = QInputDialog.getText(self, "Create playlist", "Name of playlist:")
         if not ok or not playlist_name:
             return
 
         try:
-            # Playlist bei Spotify erstellen
             playlist = sp.user_playlist_create(sp.me()['id'], playlist_name)
             playlist_id = playlist['id']
 
@@ -195,8 +184,8 @@ class MainWindow(QMainWindow):
                             break
                         else:
                             manual_search = QMessageBox.question(
-                                self, "Song übersprungen",
-                                "Kein passender Song gefunden. Möchtest du erneut suchen?",
+                                self, "Song skipped",
+                                "No matching song found. Do you want to search again?",
                                 QMessageBox.Yes | QMessageBox.No
                             )
                             if manual_search == QMessageBox.No:
@@ -204,32 +193,30 @@ class MainWindow(QMainWindow):
                                 break
                             search_dialog = SearchWizard(query, self)
                             if search_dialog.exec_() == QDialog.Accepted:
-                                query = search_dialog.updated_query  # Aktualisiert den Suchbegriff
+                                query = search_dialog.updated_query
                             else:
                                 self.skipped_songs.append(query)
                                 break
 
-            QMessageBox.information(self, "Erfolg", f"Playlist '{playlist_name}' wurde erfolgreich erstellt.")
+            QMessageBox.information(self, "Success", f"Playlist '{playlist_name}' was created.")
             self.show_skipped_songs()
 
         except Exception as e:
-            QMessageBox.critical(self, "Fehler", f"Fehler bei der Spotify-Integration: {e}")
+            QMessageBox.critical(self, "Error", f"Error with spotify integration: {e}")
 
     def show_skipped_songs(self):
-        """Zeigt übersprungene Songs in einem Dialog an, als komma-separierte Liste."""
         if not self.skipped_songs:
-            QMessageBox.information(self, "Info", "Keine Songs wurden übersprungen.")
+            QMessageBox.information(self, "Info", "No songs where skipped.")
             return
 
         skipped_dialog = QDialog(self)
-        skipped_dialog.setWindowTitle("Übersprungene Songs")
+        skipped_dialog.setWindowTitle("Skipped songs")
         layout = QVBoxLayout(skipped_dialog)
 
-        # Komma-separierte Liste der übersprungenen Songs
         skipped_songs_text = ", ".join(self.skipped_songs)
 
         text_edit = QTextEdit(skipped_dialog)
-        text_edit.setPlainText(skipped_songs_text)  # Alle Songs als eine einzelne, komma-separierte Liste
+        text_edit.setPlainText(skipped_songs_text)
         text_edit.setReadOnly(True)
         layout.addWidget(text_edit)
 
